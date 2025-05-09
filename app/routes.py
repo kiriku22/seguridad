@@ -1,13 +1,12 @@
-#routes.py
-
 from flask import render_template, url_for, flash, redirect, request
-from app import db, bcrypt
-from . import app
-from forms import RegistrationForm, LoginForm, UpdateAccountForm
-from models import User,Post
+from app import db, bcrypt , limiter
+from app.forms import RegistrationForm, LoginForm, UpdateAccountForm
+from app.models import User,Post
 from flask_login import login_user, current_user, logout_user, login_required
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from . import app
+
+
+
 
 @app.route("/")
 @app.route("/base")
@@ -30,11 +29,9 @@ def register():
     return render_template('register.html', title='Register', form=form)
 
 
-limiter = Limiter(app, key_func=get_remote_address)
-
 @app.route("/login", methods=['GET', 'POST'])
 @limiter.limit("5 per minute")  # Máximo 5 intentos por minuto
-@app.route("/login", methods=['GET', 'POST'])
+
 def login():
     if current_user.is_authenticated:
          return redirect(url_for('home'))
