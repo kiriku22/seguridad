@@ -20,59 +20,43 @@ jobs:
 
       - name: Set up Docker
         run: |
-          # Remove any existing Docker installations to prevent conflicts
-          sudo apt-get remove -y docker docker-engine docker.io containerd runc || true
-          
-          # Install prerequisites
           sudo apt-get update
-          sudo apt-get install -y \
-              apt-transport-https \
-              ca-certificates \
-              curl \
-              gnupg-agent \
-              software-properties-common
-          
-          # Add Docker's official GPG key
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-          
-          # Set up the stable repository
-          echo \
-            "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-          
-          # Install Docker Engine
-          sudo apt-get update
-          sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-          
-          # Install Docker Compose
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo apt-get install -y curl
+          curl -fsSL https://get.docker.com | sh
+          sudo usermod -aG docker $USER
+          sudo systemctl enable docker
+          sudo systemctl start docker
+          sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
 
       - name: Pull OWASP ZAP image
-        run: docker pull owasp/zap2docker-stable
+        run: docker pull owasp/zap2docker-stable:latest
 
       - name: Start application
         run: |
           docker-compose up -d --build
           echo "Waiting for application to be ready..."
-          timeout 60 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:5000)" != "200" ]]; do 
+          timeout 120 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:5000)" != "200" ]]; do 
             sleep 5; 
+            echo "Retrying connection to application...";
+            docker-compose logs --tail=20;
           done' || false
 
       - name: Run ZAP Baseline Scan
         run: |
           docker run --rm \
           -v $(pwd):/zap/wrk \
-          -t owasp/zap2docker-stable \
+          -t owasp/zap2docker-stable:latest \
           zap-baseline.py \
           -t http://host.docker.internal:5000 \
           -g gen.conf \
           -r zap-report.html \
           -x zap-report.xml \
-          -a
+          -a \
+          -d
 
       - name: Upload ZAP Scan Reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: zap-security-reports
           path: |
