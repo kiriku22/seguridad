@@ -44,7 +44,7 @@ jobs:
           -a
 
       - name: Upload ZAP Scan Reports
-        uses: actions/upload-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: zap-security-reports
           path: |
