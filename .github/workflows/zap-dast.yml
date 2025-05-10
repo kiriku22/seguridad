@@ -1,35 +1,45 @@
-name: ZAP DAST
+name: ZAP DAST Security Scan
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   zap_scan:
     runs-on: ubuntu-latest
+    container:
+      image: owasp/zap2docker-stable
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Build and start the app using Docker
+      - name: Start application
         run: |
-          docker-compose up -d
-          echo "Esperando que la app esté lista..."
-          sleep 15
+          docker-compose up -d --build
+          echo "Waiting for application to be ready..."
+          timeout 60 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:5000)" != "200" ]]; do 
+            sleep 5; 
+          done' || false
 
-      - name: Run OWASP ZAP Baseline Scan
-        uses: zaproxy/action-baseline@v0.9.0
-        with:
-          target: 'http://localhost:5000'
-          docker_name: 'owasp/zap2docker-stable'
-          cmd_options: '-config api.disablekey=true'
-          report_html: true
+      - name: Run ZAP Baseline Scan
+        run: |
+          zap-baseline.py -t http://host.docker.internal:5000 \
+          -c zap-baseline.conf \
+          -r report.html \
+          -x report.xml \
+          --hook=zap_hooks.py \
+          -a
 
-      - name: Upload ZAP Report
+      - name: Store reports
         uses: actions/upload-artifact@v3
         with:
-          name: zap-report
-          path: report_html.html
+          name: zap-security-reports
+          path: |
+            report.html
+            report.xml
+
+      - name: Cleanup
+        if: always()
+        run: docker-compose down
