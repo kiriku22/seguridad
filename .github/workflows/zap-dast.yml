@@ -30,7 +30,7 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
 
       - name: Pull OWASP ZAP image
-        run: docker pull owasp/zap2docker-stable:latest
+        run: docker pull ghcr.io/zaproxy/zaproxy:stable
 
       - name: Start application
         run: |
@@ -46,7 +46,7 @@ jobs:
         run: |
           docker run --rm \
           -v $(pwd):/zap/wrk \
-          -t owasp/zap2docker-stable:latest \
+          -t ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://host.docker.internal:5000 \
           -g gen.conf \
