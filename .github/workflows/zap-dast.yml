@@ -58,11 +58,10 @@ jobs:
 
       - name: Run ZAP Baseline Scan with enhanced debugging
         run: |
-          echo "Running ZAP scan with full debug output..."
           docker run --rm \
-            --add-host=host.docker.internal:host-gateway \
-            -v $(pwd):/zap/wrk \
-            -e ZAP_LOG_LEVEL=DEBUG \
+            --user zap:zap \
+            -v $(pwd)/zap_workdir:/zap/wrk:rw \
+            -v $(pwd)/gen.conf:/zap/wrk/gen.conf:ro \
             -t ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://host.docker.internal:5000 \
@@ -72,7 +71,7 @@ jobs:
             -a \
             -d \
             -I
-
+            
       - name: Upload Scan Reports
         if: always()
         uses: actions/upload-artifact@v4
