@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       web:
-        image: python:3.12
+        image: python:3.129
         ports:
           - 5000:5000
         options: >-
