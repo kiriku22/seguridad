@@ -43,14 +43,17 @@ jobs:
           -x zap-report.xml \
           -a
 
-      - name: Store reports
+      - name: Upload ZAP Scan Reports
         uses: actions/upload-artifact@v3
         with:
           name: zap-security-reports
           path: |
             zap-report.html
             zap-report.xml
+          retention-days: 5
 
       - name: Cleanup
         if: always()
-        run: docker-compose down
+        run: |
+          docker-compose down
+          docker system prune -f
