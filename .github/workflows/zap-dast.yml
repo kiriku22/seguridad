@@ -1,0 +1,28 @@
+name: OWASP ZAP DAST Scan
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  zap_scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+
+      # Opcional: levantar tu aplicación
+      - name: Levantar la app (Docker Compose)
+        run: docker-compose up -d
+        # O si usas otro script, cámbialo aquí
+
+      - name: Esperar 10s para que la app esté lista
+        run: sleep 10
+
+      - name: Run OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:5000' # Cambia según el puerto de tu app
