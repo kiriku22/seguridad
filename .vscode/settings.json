@@ -3,5 +3,8 @@
         "./app",
         "./app"
     ],
-    "DockerRun.DisableDockerrc": true
+    "DockerRun.DisableDockerrc": true,
+    "DockerRun.Containers": [
+        "b1abf5600a1c"
+    ]
 }

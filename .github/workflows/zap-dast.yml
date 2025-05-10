@@ -8,12 +8,20 @@ on:
 jobs:
   zap_scan:
     runs-on: ubuntu-latest
-    container:
-      image: owasp/zap2docker-stable
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker.io docker-compose
+          sudo systemctl start docker
+          sudo usermod -aG docker $USER
+
+      - name: Pull OWASP ZAP image
+        run: docker pull owasp/zap2docker-stable
 
       - name: Start application
         run: |
@@ -25,11 +33,14 @@ jobs:
 
       - name: Run ZAP Baseline Scan
         run: |
-          zap-baseline.py -t http://host.docker.internal:5000 \
-          -c zap-baseline.conf \
-          -r report.html \
-          -x report.xml \
-          --hook=zap_hooks.py \
+          docker run --rm \
+          -v $(pwd):/zap/wrk \
+          -t owasp/zap2docker-stable \
+          zap-baseline.py \
+          -t http://host.docker.internal:5000 \
+          -g gen.conf \
+          -r zap-report.html \
+          -x zap-report.xml \
           -a
 
       - name: Store reports
@@ -37,8 +48,8 @@ jobs:
         with:
           name: zap-security-reports
           path: |
-            report.html
-            report.xml
+            zap-report.html
+            zap-report.xml
 
       - name: Cleanup
         if: always()
