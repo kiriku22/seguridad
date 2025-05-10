@@ -21,7 +21,7 @@ jobs:
       - name: Set up Docker
         run: |
           sudo apt-get update
-          sudo apt-get install -y curl
+          sudo apt-get install -y curl net-tools
           curl -fsSL https://get.docker.com | sh
           sudo usermod -aG docker $USER
           sudo systemctl enable docker
@@ -29,39 +29,68 @@ jobs:
           sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
 
-      - name: Pull OWASP ZAP image
+      - name: Verify network connectivity
+        run: |
+          docker network ls
+          ifconfig -a
+          netstat -tulnp
+          ping -c 4 host.docker.internal || true
+
+      - name: Pull ZAP image
         run: docker pull ghcr.io/zaproxy/zaproxy:stable
 
-      - name: Start application
+      - name: Start application with network diagnostics
         run: |
           docker-compose up -d --build
-          echo "Waiting for application to be ready..."
-          timeout 120 bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:5000)" != "200" ]]; do 
-            sleep 5; 
-            echo "Retrying connection to application...";
+          echo "Application containers:"
+          docker ps -a
+          echo "Network inspection:"
+          docker network inspect bridge
+          echo "Waiting for application (max 2 minutes)..."
+          timeout 120 bash -c 'while [[ "$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000)" != "200" ]]; do 
+            sleep 5;
+            echo "Attempting connection...";
             docker-compose logs --tail=20;
-          done' || false
+            docker run --network host --rm appropriate/curl -v http://localhost:5000 || true;
+          done'
+          echo "Final connection test:"
+          curl -v http://localhost:5000 || true
 
-      - name: Run ZAP Baseline Scan
+      - name: Run ZAP Baseline Scan with enhanced debugging
         run: |
+          echo "Running ZAP scan with full debug output..."
           docker run --rm \
-          -v $(pwd):/zap/wrk \
-          -t ghcr.io/zaproxy/zaproxy:stable \
-          zap-baseline.py \
-          -t http://host.docker.internal:5000 \
-          -g gen.conf \
-          -r zap-report.html \
-          -x zap-report.xml \
-          -a \
-          -d
+            --add-host=host.docker.internal:host-gateway \
+            -v $(pwd):/zap/wrk \
+            -e ZAP_LOG_LEVEL=DEBUG \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://host.docker.internal:5000 \
+            -g gen.conf \
+            -r zap-report.html \
+            -x zap-report.xml \
+            -a \
+            -d \
+            -I
 
-      - name: Upload ZAP Scan Reports
-        uses: actions/upload-artifact@v4
+      - name: Upload Scan Reports
+        if: always()
+        uses: actions/upload-artifact@v3
         with:
           name: zap-security-reports
           path: |
             zap-report.html
             zap-report.xml
+          retention-days: 5
+
+      - name: Upload Diagnostic Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-diagnostics
+          path: |
+            docker-compose-logs.txt
+            network-info.txt
           retention-days: 5
 
       - name: Cleanup
